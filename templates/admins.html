@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Administratoren · DigiBo Terminmanager{% endblock %}
+{% block content %}
+<div class="page-heading mb-4">
+  <p class="eyebrow mb-2">ZUGANGSVERWALTUNG</p>
+  <h1 class="h2 mb-1">Administratoren</h1>
+  <p class="text-secondary mb-0">Verwalten Sie die Konten mit Zugriff auf die Terminverwaltung.</p>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-5">
+    <section class="card form-card">
+      <h2 class="h5 mb-3">Neuen Administrator anlegen</h2>
+      <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+        <div class="mb-3">
+          {{ form.username.label(class="form-label") }}
+          {{ form.username(class="form-control", autocomplete="username") }}
+          {% for error in form.username.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="mb-3">
+          {{ form.email.label(class="form-label") }}
+          {{ form.email(class="form-control", type="email", autocomplete="email") }}
+          {% for error in form.email.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="mb-3">
+          {{ form.password.label(class="form-label") }}
+          {{ form.password(class="form-control", autocomplete="new-password") }}
+          <div class="form-text">Mindestens 12 Zeichen. Das Passwort wird gehasht gespeichert.</div>
+          {% for error in form.password.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+        </div>
+        {{ form.submit(class="btn btn-primary w-100") }}
+      </form>
+    </section>
+  </div>
+
+  <div class="col-12 col-lg-7">
+    <section class="card table-card">
+      <div class="card-header bg-white border-0 pt-4 px-4">
+        <h2 class="h5 mb-0">Vorhandene Konten <span class="text-secondary">({{ admins|length }})</span></h2>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead><tr><th>Benutzername</th><th>E-Mail</th><th>Aktionen</th></tr></thead>
+          <tbody>
+            {% for admin in admins %}
+            <tr>
+              <td class="fw-semibold">
+                {{ admin.username }}
+                {% if admin.id == current_user.id %}<span class="badge text-bg-light ms-1">Sie</span>{% endif %}
+              </td>
+              <td>{{ admin.email }}</td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-2">
+                  <a class="btn btn-sm btn-outline-primary"
+                     href="{{ url_for('admin.edit_administrator', admin_id=admin.id) }}">Bearbeiten</a>
+                  {% if admins|length > 1 %}
+                  <form method="post" action="{{ url_for('admin.delete_administrator', admin_id=admin.id) }}"
+                        onsubmit="return confirm('Administrator wirklich löschen?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
+                  </form>
+                  {% else %}
+                  <span class="text-secondary small align-self-center">Letzter Admin</span>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}

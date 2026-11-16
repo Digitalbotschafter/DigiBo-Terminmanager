@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Termin buchen · DigiBo Terminmanager{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <a class="back-link" href="{{ url_for('public.sessions') }}">← Sitzungen</a>
+  <div class="mt-4">
+    <p class="eyebrow mb-2">DIGITALSPRECHSTUNDE</p>
+    <h1 class="h2 mb-1">{{ session.datum.strftime("%d.%m.%Y") }} · {{ session.startzeit.strftime("%H:%M") }}–{{ session.endzeit.strftime("%H:%M") }}</h1>
+    <p class="text-secondary mb-0">{{ session.ort }}{% if session.beschreibung %} · {{ session.beschreibung }}{% endif %}</p>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+  <div class="col-12 col-lg-8 col-xl-7">
+    <form method="post" class="card form-card" novalidate>
+      {{ form.hidden_tag() }}
+      <h2 class="h5 mb-3">Ihre Buchung</h2>
+      <p class="text-secondary small">Buchungen sind für 15 oder 30 Minuten möglich. Bei 30 Minuten wird der folgende Viertelstunden-Slot mitreserviert.</p>
+
+      <div class="mb-3">
+        {{ form.dauer.label(class="form-label") }}
+        {{ form.dauer(class="form-select", id="booking-duration") }}
+        {% for error in form.dauer.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="mb-3" id="slot-selection">
+        {{ form.slot_id.label(class="form-label", **{"for": "booking-slot"}) }}
+        <select class="form-select" id="booking-slot" name="slot_id">
+          <option value="">Bitte Startzeit wählen</option>
+          {% for slot, durations in slot_options %}
+          <option value="{{ slot.id }}" data-durations="{{ durations|join(',') }}"
+                  {% if form.slot_id.data == slot.id %}selected{% endif %}>
+            {{ slot.zeitpunkt.strftime("%H:%M") }} Uhr
+          </option>
+          {% endfor %}
+        </select>
+        {% for error in form.slot_id.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="alert alert-info py-2" id="no-available-slot" {% if available_for_duration %}hidden{% endif %}>
+        Für diese Dauer ist kein passender Termin frei. Beim Absenden werden Sie automatisch auf die Warteliste gesetzt.
+      </div>
+      <div class="mb-3">
+        {{ form.name.label(class="form-label") }}
+        {{ form.name(class="form-control", autocomplete="name") }}
+        {% for error in form.name.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="mb-3">
+        {{ form.email.label(class="form-label") }}
+        {{ form.email(class="form-control", type="email", autocomplete="email") }}
+        {% for error in form.email.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="mb-4">
+        {{ form.telefon.label(class="form-label") }}
+        {{ form.telefon(class="form-control", type="tel", autocomplete="tel") }}
+        <div class="form-text">Optional</div>
+        {% for error in form.telefon.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+      </div>
+      {{ form.submit(class="btn btn-primary btn-lg w-100") }}
+    </form>
+  </div>
+</div>
+<script>
+  (() => {
+    const duration = document.getElementById("booking-duration");
+    const slot = document.getElementById("booking-slot");
+    const slotSelection = document.getElementById("slot-selection");
+    const noSlot = document.getElementById("no-available-slot");
+    const options = Array.from(slot.options).filter(option => option.value);
+
+    function updateAvailableSlots() {
+      const selectedDuration = duration.value;
+      let available = 0;
+      options.forEach(option => {
+        const allowed = option.dataset.durations.split(",").includes(selectedDuration);
+        option.hidden = !allowed;
+        option.disabled = !allowed;
+        if (allowed) available += 1;
+        if (!allowed && option.selected) slot.value = "";
+      });
+      slotSelection.hidden = available === 0;
+      noSlot.hidden = available > 0;
+    }
+
+    duration.addEventListener("change", updateAvailableSlots);
+    updateAvailableSlots();
+  })();
+</script>
+{% endblock %}

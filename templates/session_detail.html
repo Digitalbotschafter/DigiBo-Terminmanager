@@ -17,10 +17,10 @@
         {% for slot in session.slots %}
           <tr>
             <td class="fw-semibold">{{ slot.zeitpunkt.strftime("%H:%M") }}</td>
-            <td><span class="badge {{ 'text-bg-success' if slot.status == 'frei' else ('text-bg-warning' if slot.status == 'reserviert' else 'text-bg-primary') }}">{{ slot.status|capitalize }}</span></td>
-            <td>{% if slot.booking %}{{ slot.booking.name }}<span class="d-block text-secondary small">{{ slot.booking.email }}</span>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+            <td><span class="badge {{ 'text-bg-success' if slot.status == 'frei' else ('text-bg-warning' if slot.status == 'reserviert' else 'text-bg-primary') }}">{{ 'Folgeslot' if slot.id in extended_slot_ids else slot.status|capitalize }}</span></td>
+            <td>{% if slot.booking %}{{ slot.booking.name }}<span class="d-block text-secondary small">{{ slot.booking.email }} · {{ slot.booking.dauer }} Min.</span>{% elif slot.id in extended_slot_ids %}<span class="text-secondary small">Teil einer 30-Minuten-Buchung</span>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
             <td class="text-end text-nowrap">
-              {% if slot.status != 'belegt' %}
+              {% if slot.status != 'belegt' and slot.id not in extended_slot_ids %}
               <form class="d-inline" method="post" action="{{ url_for('admin.toggle_slot_reservation', slot_id=slot.id) }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn btn-sm btn-outline-secondary" type="submit">{{ 'Freigeben' if slot.status == 'reserviert' else 'Reservieren' }}</button>
@@ -45,13 +45,26 @@
       {% if booking_form.slot_id.choices %}
       <form method="post" action="{{ url_for('admin.create_booking', session_id=session.id) }}" novalidate>
         {{ booking_form.hidden_tag() }}
-        <div class="mb-3">{{ booking_form.slot_id.label(class="form-label") }}{{ booking_form.slot_id(class="form-select") }}</div>
+        <div class="mb-3">
+          {{ booking_form.dauer.label(class="form-label") }}
+          {{ booking_form.dauer(class="form-select", id="admin-booking-duration") }}
+        </div>
+        <div class="mb-3">
+          {{ booking_form.slot_id.label(class="form-label", **{"for": "admin-booking-slot"}) }}
+          <select class="form-select" id="admin-booking-slot" name="slot_id">
+            <option value="">Bitte Startzeit wählen</option>
+            {% for slot, durations in slot_options %}
+            <option value="{{ slot.id }}" data-durations="{{ durations|join(',') }}">{{ slot.zeitpunkt.strftime("%H:%M") }}</option>
+            {% endfor %}
+          </select>
+        </div>
         <div class="mb-3">{{ booking_form.name.label(class="form-label") }}{{ booking_form.name(class="form-control") }}</div>
         <div class="mb-3">{{ booking_form.email.label(class="form-label") }}{{ booking_form.email(class="form-control", type="email") }}</div>
-        <div class="row g-3 mb-3"><div class="col-7">{{ booking_form.telefon.label(class="form-label") }}{{ booking_form.telefon(class="form-control") }}</div><div class="col-5">{{ booking_form.dauer.label(class="form-label") }}{{ booking_form.dauer(class="form-control", value="15", min="1") }}</div></div>
+        <div class="mb-3">{{ booking_form.telefon.label(class="form-label") }}{{ booking_form.telefon(class="form-control") }}</div>
         {{ booking_form.submit(class="btn btn-primary w-100") }}
       </form>
-      {% else %}<p class="text-secondary mb-0">Es gibt aktuell keine freien Zeitfenster.</p>{% endif %}
+      <p class="form-text mt-2 mb-0">Bei 30 Minuten wird der folgende Slot mitreserviert.</p>
+      {% else %}<p class="text-secondary mb-0">Es gibt aktuell keinen passenden freien Termin.</p>{% endif %}
     </section>
     <section class="card form-card">
       <h2 class="h5 mb-3">Warteliste</h2>
@@ -59,22 +72,33 @@
       <ul class="list-group list-group-flush mb-3">
         {% for entry in session.waiting_list %}
         <li class="list-group-item px-0 d-flex justify-content-between align-items-start gap-2">
-          <span><strong>{{ entry.name }}</strong><span class="d-block small text-secondary">{{ entry.email }}{% if entry.telefon %} · {{ entry.telefon }}{% endif %}</span></span>
+          <span><strong>{{ entry.name }}</strong><span class="d-block small text-secondary">{{ entry.email }} · {{ entry.dauer }} Min.{% if entry.telefon %} · {{ entry.telefon }}{% endif %}</span></span>
           <form method="post" action="{{ url_for('admin.delete_waitlist_entry', entry_id=entry.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Wartelisteneintrag löschen">Entfernen</button>
           </form>
         </li>
         {% endfor %}
-      </ul>{% else %}<p class="text-secondary small">Noch keine Einträge.</p>{% endif %}
-      <form method="post" action="{{ url_for('admin.create_waitlist_entry', session_id=session.id) }}" novalidate>
-        {{ waitlist_form.hidden_tag() }}
-        <div class="mb-3">{{ waitlist_form.name.label(class="form-label") }}{{ waitlist_form.name(class="form-control") }}</div>
-        <div class="mb-3">{{ waitlist_form.email.label(class="form-label") }}{{ waitlist_form.email(class="form-control", type="email") }}</div>
-        <div class="mb-3">{{ waitlist_form.telefon.label(class="form-label") }}{{ waitlist_form.telefon(class="form-control") }}</div>
-        {{ waitlist_form.submit(class="btn btn-outline-primary w-100") }}
-      </form>
+      </ul>{% else %}<p class="text-secondary small mb-0">Noch keine Einträge. Nicht verfügbare Buchungsanfragen werden automatisch hier eingetragen.</p>{% endif %}
     </section>
   </div>
 </div>
+<script>
+  (() => {
+    const duration = document.getElementById("admin-booking-duration");
+    const slot = document.getElementById("admin-booking-slot");
+    if (!duration || !slot) return;
+    const options = Array.from(slot.options).filter(option => option.value);
+    function updateAvailableSlots() {
+      options.forEach(option => {
+        const allowed = option.dataset.durations.split(",").includes(duration.value);
+        option.hidden = !allowed;
+        option.disabled = !allowed;
+        if (!allowed && option.selected) slot.value = "";
+      });
+    }
+    duration.addEventListener("change", updateAvailableSlots);
+    updateAvailableSlots();
+  })();
+</script>
 {% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}DigiBo Terminmanager · Digitalsprechstunden{% endblock %}
+{% block content %}
+<section class="home-hero">
+  <div class="home-copy">
+    <p class="eyebrow mb-3">DIGITALBOTSCHAFTER PIRMASENSER LAND</p>
+    <h1 class="display-5 fw-bold mb-3">Persönliche Hilfe bei digitalen Fragen.</h1>
+    <p class="lead text-secondary mb-4">
+      Buchen Sie einen Termin für Ihre Digitalsprechstunde. Wir unterstützen Sie
+      verständlich und direkt bei Ihren Anliegen.
+    </p>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('public.sessions') }}">Termin buchen</a>
+    {% if current_user.is_authenticated %}
+    <a class="btn btn-outline-primary btn-lg ms-sm-2 mt-2 mt-sm-0" href="{{ url_for('admin.dashboard') }}">Verwaltung öffnen</a>
+    {% endif %}
+  </div>
+  <div class="home-symbol" aria-hidden="true">D</div>
+</section>
+{% endblock %}

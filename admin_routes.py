@@ -1,15 +1,31 @@
-"""Admin-only appointment, booking, and waiting-list management."""
+"""Admin-only session, booking, and waiting-list management."""
 
-import secrets
 from datetime import date, datetime
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
+from flask_login import current_user, login_required, logout_user
 from flask_wtf import FlaskForm
-from wtforms import DateField, IntegerField, SelectField, StringField, SubmitField, TextAreaField, TimeField
-from wtforms.validators import DataRequired, Email, Length, NumberRange, Optional
+from wtforms.fields.choices import SelectChoice
+from wtforms import (
+    DateField,
+    PasswordField,
+    StringField,
+    SubmitField,
+    TextAreaField,
+    TimeField,
+)
+from wtforms.validators import DataRequired, Email, Length, Optional
 
 from app import generate_slot_times
+from booking import (
+    BOOKING_DURATIONS,
+    BookingForm,
+    available_booking_slots,
+    booking_slot_options,
+    delete_booking_and_release_slots,
+    is_extension_slot,
+    save_booking,
+)
 from models import Admin, Booking, Session, Slot, WaitingList, db
 
 admin_bp = Blueprint("admin", __name__)
@@ -24,20 +40,31 @@ class SessionForm(FlaskForm):
     submit = SubmitField("Sitzung anlegen")
 
 
-class BookingForm(FlaskForm):
-    slot_id = SelectField("Freier Termin", coerce=int, validators=[DataRequired()])
-    name = StringField("Name", validators=[DataRequired(), Length(max=160)])
-    email = StringField("E-Mail", validators=[DataRequired(), Email(), Length(max=254)])
-    telefon = StringField("Telefon", validators=[Optional(), Length(max=50)])
-    dauer = IntegerField("Dauer (Minuten)", validators=[DataRequired(), NumberRange(min=1, max=1440)])
-    submit = SubmitField("Buchung speichern")
+class AdminForm(FlaskForm):
+    username = StringField(
+        "Benutzername", validators=[DataRequired(), Length(min=3, max=80)]
+    )
+    email = StringField(
+        "E-Mail-Adresse", validators=[DataRequired(), Email(), Length(max=254)]
+    )
+    password = PasswordField(
+        "Startpasswort", validators=[DataRequired(), Length(min=12, max=128)]
+    )
+    submit = SubmitField("Administrator anlegen")
 
 
-class WaitingListForm(FlaskForm):
-    name = StringField("Name", validators=[DataRequired(), Length(max=160)])
-    email = StringField("E-Mail", validators=[DataRequired(), Email(), Length(max=254)])
-    telefon = StringField("Telefon", validators=[Optional(), Length(max=50)])
-    submit = SubmitField("Auf Warteliste setzen")
+class AdminEditForm(FlaskForm):
+    username = StringField(
+        "Benutzername", validators=[DataRequired(), Length(min=3, max=80)]
+    )
+    email = StringField(
+        "E-Mail-Adresse", validators=[DataRequired(), Email(), Length(max=254)]
+    )
+    password = PasswordField(
+        "Neues Passwort",
+        validators=[Optional(), Length(min=12, max=128)],
+    )
+    submit = SubmitField("Änderungen speichern")
 
 
 @admin_bp.before_request
@@ -80,6 +107,97 @@ def dashboard():
     )
 
 
+@admin_bp.route("/administratoren", methods=["GET", "POST"])
+@login_required
+def administrators():
+    form = AdminForm()
+    if form.validate_on_submit():
+        username = form.username.data.strip()
+        email = form.email.data.strip().lower()
+
+        username_exists = Admin.query.filter(
+            db.func.lower(Admin.username) == username.lower()
+        ).first()
+        email_exists = Admin.query.filter(
+            db.func.lower(Admin.email) == email
+        ).first()
+
+        if username_exists:
+            flash("Dieser Benutzername wird bereits verwendet.", "danger")
+        elif email_exists:
+            flash("Diese E-Mail-Adresse wird bereits verwendet.", "danger")
+        else:
+            admin = Admin(username=username, email=email, role="admin")
+            admin.set_password(form.password.data)
+            db.session.add(admin)
+            db.session.commit()
+            flash(f"Administrator „{username}“ wurde angelegt.", "success")
+            return redirect(url_for("admin.administrators"))
+
+    admins = Admin.query.order_by(Admin.username).all()
+    return render_template("admins.html", form=form, admins=admins)
+
+
+@admin_bp.route("/administratoren/<int:admin_id>/bearbeiten", methods=["GET", "POST"])
+@login_required
+def edit_administrator(admin_id):
+    admin = db.get_or_404(Admin, admin_id)
+    form = AdminEditForm(obj=admin)
+
+    if form.validate_on_submit():
+        username = form.username.data.strip()
+        email = form.email.data.strip().lower()
+        username_exists = Admin.query.filter(
+            db.func.lower(Admin.username) == username.lower(),
+            Admin.id != admin.id,
+        ).first()
+        email_exists = Admin.query.filter(
+            db.func.lower(Admin.email) == email,
+            Admin.id != admin.id,
+        ).first()
+
+        if username_exists:
+            flash("Dieser Benutzername wird bereits verwendet.", "danger")
+        elif email_exists:
+            flash("Diese E-Mail-Adresse wird bereits verwendet.", "danger")
+        else:
+            admin.username = username
+            admin.email = email
+            if form.password.data:
+                admin.set_password(form.password.data)
+            db.session.commit()
+            flash(f"Administrator „{username}“ wurde aktualisiert.", "success")
+            return redirect(url_for("admin.administrators"))
+
+    return render_template(
+        "edit_admin.html",
+        form=form,
+        admin=admin,
+        is_current_admin=admin.id == current_user.id,
+    )
+
+
+@admin_bp.post("/administratoren/<int:admin_id>/loeschen")
+@login_required
+def delete_administrator(admin_id):
+    admin = db.get_or_404(Admin, admin_id)
+
+    if Admin.query.count() <= 1:
+        flash("Der letzte Administrator kann nicht gelöscht werden.", "warning")
+    else:
+        is_current_admin = admin.id == current_user.id
+        username = admin.username
+        db.session.delete(admin)
+        if is_current_admin:
+            logout_user()
+        db.session.commit()
+        flash(f"Administrator „{username}“ wurde gelöscht.", "success")
+        if is_current_admin:
+            return redirect(url_for("auth.login"))
+
+    return redirect(url_for("admin.administrators"))
+
+
 @admin_bp.get("/sitzungen")
 @login_required
 def sessions():
@@ -119,17 +237,22 @@ def create_session():
 def session_detail(session_id):
     session = db.get_or_404(Session, session_id)
     booking_form = BookingForm()
+    duration = booking_form.dauer.data
+    if duration not in BOOKING_DURATIONS:
+        duration = 15
+    available_slots = available_booking_slots(session, duration)
     booking_form.slot_id.choices = [
-        (slot.id, slot.zeitpunkt.strftime("%H:%M"))
-        for slot in session.slots
-        if slot.status == "frei"
+        SelectChoice(str(slot.id), slot.zeitpunkt.strftime("%H:%M"))
+        for slot in available_slots
     ]
-    waitlist_form = WaitingListForm()
     return render_template(
         "session_detail.html",
         session=session,
         booking_form=booking_form,
-        waitlist_form=waitlist_form,
+        slot_options=booking_slot_options(session),
+        extended_slot_ids={
+            slot.id for slot in session.slots if is_extension_slot(slot)
+        },
     )
 
 
@@ -138,25 +261,30 @@ def session_detail(session_id):
 def create_booking(session_id):
     session = db.get_or_404(Session, session_id)
     form = BookingForm()
-    free_slots = [slot for slot in session.slots if slot.status == "frei"]
-    form.slot_id.choices = [(slot.id, slot.zeitpunkt.strftime("%H:%M")) for slot in free_slots]
+    duration = form.dauer.data
+    if duration not in BOOKING_DURATIONS:
+        duration = 15
+    available_slots = available_booking_slots(session, duration)
+    form.slot_id.choices = [
+        SelectChoice(str(slot.id), slot.zeitpunkt.strftime("%H:%M"))
+        for slot in available_slots
+    ]
     if form.validate_on_submit():
-        slot = db.session.get(Slot, form.slot_id.data)
-        if slot is None or slot.session_id != session.id or slot.status != "frei":
-            flash("Dieses Zeitfenster ist nicht mehr frei.", "danger")
-        else:
-            booking = Booking(
-                slot_id=slot.id,
-                name=form.name.data.strip(),
-                email=form.email.data.strip(),
-                telefon=(form.telefon.data or "").strip(),
-                dauer=form.dauer.data,
-                token=secrets.token_urlsafe(24),
-            )
-            slot.status = "belegt"
-            db.session.add(booking)
-            db.session.commit()
+        if not available_slots:
+            flash("Für diese Dauer ist kein passender freier Termin verfügbar.", "warning")
+        elif form.slot_id.data is None:
+            flash("Bitte wählen Sie einen freien Termin aus.", "danger")
+        elif save_booking(
+            session,
+            form.slot_id.data,
+            form.name.data.strip(),
+            form.email.data.strip().lower(),
+            (form.telefon.data or "").strip(),
+            duration,
+        ):
             flash("Buchung gespeichert.", "success")
+        else:
+            flash("Dieses Zeitfenster ist nicht mehr frei.", "danger")
     else:
         flash("Bitte prüfen Sie die Buchungsangaben.", "danger")
     return redirect(url_for("admin.session_detail", session_id=session.id))
@@ -167,32 +295,9 @@ def create_booking(session_id):
 def delete_booking(booking_id):
     booking = db.get_or_404(Booking, booking_id)
     session_id = booking.slot.session_id
-    booking.slot.status = "frei"
-    db.session.delete(booking)
-    db.session.commit()
-    flash("Buchung gelöscht; das Zeitfenster ist wieder frei.", "success")
+    delete_booking_and_release_slots(booking)
+    flash("Buchung gelöscht; die belegten Zeitfenster sind wieder frei.", "success")
     return redirect(url_for("admin.session_detail", session_id=session_id))
-
-
-@admin_bp.post("/sitzungen/<int:session_id>/warteliste")
-@login_required
-def create_waitlist_entry(session_id):
-    session = db.get_or_404(Session, session_id)
-    form = WaitingListForm()
-    if form.validate_on_submit():
-        db.session.add(
-            WaitingList(
-                session_id=session.id,
-                name=form.name.data.strip(),
-                email=form.email.data.strip(),
-                telefon=(form.telefon.data or "").strip(),
-            )
-        )
-        db.session.commit()
-        flash("Eintrag auf der Warteliste gespeichert.", "success")
-    else:
-        flash("Bitte prüfen Sie die Wartelistenangaben.", "danger")
-    return redirect(url_for("admin.session_detail", session_id=session.id))
 
 
 @admin_bp.post("/warteliste/<int:entry_id>/loeschen")
@@ -210,7 +315,9 @@ def delete_waitlist_entry(entry_id):
 @login_required
 def toggle_slot_reservation(slot_id):
     slot = db.get_or_404(Slot, slot_id)
-    if slot.status == "belegt":
+    if is_extension_slot(slot):
+        flash("Dieser Slot gehört zu einer 30-Minuten-Buchung und kann nicht einzeln geändert werden.", "warning")
+    elif slot.status == "belegt":
         flash("Belegte Zeitfenster können nicht reserviert werden.", "warning")
     else:
         slot.status = "reserviert" if slot.status == "frei" else "frei"

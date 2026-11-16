@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Sitzungen · DigiBo Terminmanager{% endblock %}
+{% block content %}
+<div class="page-heading mb-4">
+  <p class="eyebrow mb-2">TERMINBUCHUNG</p>
+  <h1 class="h2 mb-1">Sitzungen</h1>
+  <p class="text-secondary mb-0">Wählen Sie eine Digitalsprechstunde und anschließend einen passenden Termin.</p>
+</div>
+{% if sessions %}
+<div class="row g-3">
+  {% for session in sessions %}
+  <div class="col-12 col-lg-6">
+    <article class="card session-card h-100">
+      <div class="card-body d-flex flex-column p-4">
+        <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+          <div>
+            <p class="eyebrow mb-1">{{ session.datum.strftime("%d.%m.%Y") }}</p>
+            <h2 class="h5 mb-0">{{ session.startzeit.strftime("%H:%M") }}–{{ session.endzeit.strftime("%H:%M") }}</h2>
+          </div>
+          <span class="badge {{ 'text-bg-success' if available_counts[session.id] else 'text-bg-secondary' }}">
+            {{ available_counts[session.id] }} freie Startzeiten
+          </span>
+        </div>
+        <p class="mb-2"><strong>Ort:</strong> {{ session.ort }}</p>
+        {% if session.beschreibung %}<p class="text-secondary">{{ session.beschreibung }}</p>{% endif %}
+        <a class="btn btn-primary mt-auto align-self-start"
+           href="{{ url_for('public.session_detail', session_id=session.id) }}">Termin buchen</a>
+      </div>
+    </article>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <h2 class="h5">Zurzeit sind keine kommenden Sitzungen geplant</h2>
+  <p class="text-secondary mb-0">Schauen Sie später noch einmal vorbei.</p>
+</div>
+{% endif %}
+{% endblock %}

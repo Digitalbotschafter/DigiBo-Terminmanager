@@ -6,6 +6,7 @@ from pathlib import Path
 from flask import Flask, jsonify
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
+from sqlalchemy import inspect, text
 
 from config import Config
 from models import Admin, db
@@ -55,16 +56,17 @@ def create_app(test_config=None):
 
     from auth.routes import auth_bp
     from admin_routes import admin_bp
+    from public_routes import public_bp
 
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(admin_bp, url_prefix="/admin")
+    app.register_blueprint(public_bp)
 
     @app.get("/")
     def index():
-        from flask import redirect, url_for
-        from flask_login import current_user
+        from flask import render_template
 
-        return redirect(url_for("admin.dashboard" if current_user.is_authenticated else "auth.login"))
+        return render_template("home.html")
 
     @app.get("/health")
     def health():
@@ -72,6 +74,17 @@ def create_app(test_config=None):
 
     with app.app_context():
         db.create_all()
+        waiting_list_columns = {
+            column["name"] for column in inspect(db.engine).get_columns("waiting_list")
+        }
+        if "dauer" not in waiting_list_columns:
+            with db.engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "ALTER TABLE waiting_list "
+                        "ADD COLUMN dauer INTEGER NOT NULL DEFAULT 15"
+                    )
+                )
 
     return app
 

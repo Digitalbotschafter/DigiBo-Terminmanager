@@ -79,6 +79,7 @@ class WaitingList(db.Model):
     name = db.Column(db.String(160), nullable=False)
     email = db.Column(db.String(254), nullable=False)
     telefon = db.Column(db.String(50), nullable=False, default="")
+    dauer = db.Column(db.Integer, nullable=False, default=15, server_default="15")
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
 
     session = db.relationship("Session", back_populates="waiting_list")
