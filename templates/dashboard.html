@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Übersicht · DigiBo Sprechstunde{% endblock %}
+{% block content %}
+<div class="page-heading d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+  <div><p class="eyebrow mb-2">ADMINISTRATION</p><h1 class="h2 mb-1">Übersicht</h1><p class="text-secondary mb-0">Ihre nächsten Termine und aktuellen Kennzahlen.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('admin.create_session') }}">＋ Sitzung anlegen</a>
+</div>
+<div class="row g-3 mb-5">
+  <div class="col-12 col-md-4"><div class="metric-card"><span class="metric-icon">▦</span><div class="metric-number">{{ session_count }}</div><div class="metric-label">Künftige Sitzungen</div></div></div>
+  <div class="col-12 col-md-4"><div class="metric-card"><span class="metric-icon">✓</span><div class="metric-number">{{ booking_count }}</div><div class="metric-label">Buchungen</div></div></div>
+  <div class="col-12 col-md-4"><div class="metric-card"><span class="metric-icon">↗</span><div class="metric-number">{{ waitlist_count }}</div><div class="metric-label">Wartelisteneinträge</div></div></div>
+</div>
+<div class="section-heading d-flex justify-content-between align-items-center mb-3">
+  <div><h2 class="h4 mb-1">Kommende Sitzungen</h2><p class="text-secondary small mb-0">Nach Datum sortiert</p></div>
+  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('admin.sessions') }}">Alle Sitzungen</a>
+</div>
+{% if sessions %}
+<div class="table-responsive card table-card">
+  <table class="table align-middle mb-0">
+    <thead><tr><th>Datum</th><th>Zeit</th><th>Ort</th><th>Freie Zeitfenster</th><th></th></tr></thead>
+    <tbody>{% for session in sessions %}
+      <tr>
+        <td class="fw-semibold">{{ session.datum.strftime("%d.%m.%Y") }}</td>
+        <td>{{ session.startzeit.strftime("%H:%M") }}–{{ session.endzeit.strftime("%H:%M") }}</td>
+        <td>{{ session.ort }}</td>
+        <td><span class="badge rounded-pill text-bg-light">{{ session.slots|selectattr("status", "equalto", "frei")|list|length }} frei</span></td>
+        <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.session_detail', session_id=session.id) }}">Verwalten</a></td>
+      </tr>
+    {% endfor %}</tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><div class="empty-icon">▦</div><h3 class="h5">Noch keine Sitzungen geplant</h3><p class="text-secondary">Legen Sie Ihre erste Sprechstunde an, um Zeitfenster zu erstellen.</p><a class="btn btn-primary" href="{{ url_for('admin.create_session') }}">Sitzung anlegen</a></div>
+{% endif %}
+{% endblock %}

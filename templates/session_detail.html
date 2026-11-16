@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Sitzung verwalten · DigiBo Sprechstunde{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <a class="back-link" href="{{ url_for('admin.sessions') }}">← Sitzungen</a>
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mt-4">
+    <div><p class="eyebrow mb-2">SITZUNG VERWALTEN</p><h1 class="h2 mb-1">{{ session.datum.strftime("%d.%m.%Y") }} · {{ session.startzeit.strftime("%H:%M") }}–{{ session.endzeit.strftime("%H:%M") }}</h1><p class="text-secondary mb-0">{{ session.ort }}{% if session.beschreibung %} · {{ session.beschreibung }}{% endif %}</p></div>
+    <span class="badge text-bg-light">{{ session.slots|length }} Zeitfenster</span>
+  </div>
+</div>
+<div class="row g-4">
+  <div class="col-12 col-xl-7">
+    <section class="card table-card">
+      <div class="card-header bg-white border-0 pt-4 px-4"><h2 class="h5 mb-0">Zeitfenster &amp; Buchungen</h2></div>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0"><thead><tr><th>Beginn</th><th>Status</th><th>Buchung</th><th></th></tr></thead><tbody>
+        {% for slot in session.slots %}
+          <tr>
+            <td class="fw-semibold">{{ slot.zeitpunkt.strftime("%H:%M") }}</td>
+            <td><span class="badge {{ 'text-bg-success' if slot.status == 'frei' else ('text-bg-warning' if slot.status == 'reserviert' else 'text-bg-primary') }}">{{ slot.status|capitalize }}</span></td>
+            <td>{% if slot.booking %}{{ slot.booking.name }}<span class="d-block text-secondary small">{{ slot.booking.email }}</span>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+            <td class="text-end text-nowrap">
+              {% if slot.status != 'belegt' %}
+              <form class="d-inline" method="post" action="{{ url_for('admin.toggle_slot_reservation', slot_id=slot.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-secondary" type="submit">{{ 'Freigeben' if slot.status == 'reserviert' else 'Reservieren' }}</button>
+              </form>
+              {% endif %}
+              {% if slot.booking %}
+              <form class="d-inline" method="post" action="{{ url_for('admin.delete_booking', booking_id=slot.booking.id) }}" onsubmit="return confirm('Buchung wirklich löschen?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Löschen</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody></table>
+      </div>
+    </section>
+  </div>
+  <div class="col-12 col-xl-5">
+    <section class="card form-card mb-4">
+      <h2 class="h5 mb-3">Buchung hinzufügen</h2>
+      {% if booking_form.slot_id.choices %}
+      <form method="post" action="{{ url_for('admin.create_booking', session_id=session.id) }}" novalidate>
+        {{ booking_form.hidden_tag() }}
+        <div class="mb-3">{{ booking_form.slot_id.label(class="form-label") }}{{ booking_form.slot_id(class="form-select") }}</div>
+        <div class="mb-3">{{ booking_form.name.label(class="form-label") }}{{ booking_form.name(class="form-control") }}</div>
+        <div class="mb-3">{{ booking_form.email.label(class="form-label") }}{{ booking_form.email(class="form-control", type="email") }}</div>
+        <div class="row g-3 mb-3"><div class="col-7">{{ booking_form.telefon.label(class="form-label") }}{{ booking_form.telefon(class="form-control") }}</div><div class="col-5">{{ booking_form.dauer.label(class="form-label") }}{{ booking_form.dauer(class="form-control", value="15", min="1") }}</div></div>
+        {{ booking_form.submit(class="btn btn-primary w-100") }}
+      </form>
+      {% else %}<p class="text-secondary mb-0">Es gibt aktuell keine freien Zeitfenster.</p>{% endif %}
+    </section>
+    <section class="card form-card">
+      <h2 class="h5 mb-3">Warteliste</h2>
+      {% if session.waiting_list %}
+      <ul class="list-group list-group-flush mb-3">
+        {% for entry in session.waiting_list %}
+        <li class="list-group-item px-0 d-flex justify-content-between align-items-start gap-2">
+          <span><strong>{{ entry.name }}</strong><span class="d-block small text-secondary">{{ entry.email }}{% if entry.telefon %} · {{ entry.telefon }}{% endif %}</span></span>
+          <form method="post" action="{{ url_for('admin.delete_waitlist_entry', entry_id=entry.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit" aria-label="Wartelisteneintrag löschen">Entfernen</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>{% else %}<p class="text-secondary small">Noch keine Einträge.</p>{% endif %}
+      <form method="post" action="{{ url_for('admin.create_waitlist_entry', session_id=session.id) }}" novalidate>
+        {{ waitlist_form.hidden_tag() }}
+        <div class="mb-3">{{ waitlist_form.name.label(class="form-label") }}{{ waitlist_form.name(class="form-control") }}</div>
+        <div class="mb-3">{{ waitlist_form.email.label(class="form-label") }}{{ waitlist_form.email(class="form-control", type="email") }}</div>
+        <div class="mb-3">{{ waitlist_form.telefon.label(class="form-label") }}{{ waitlist_form.telefon(class="form-control") }}</div>
+        {{ waitlist_form.submit(class="btn btn-outline-primary w-100") }}
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}

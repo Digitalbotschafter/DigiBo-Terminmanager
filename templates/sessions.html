@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Sitzungen · DigiBo Sprechstunde{% endblock %}
+{% block content %}
+<div class="page-heading d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+  <div><p class="eyebrow mb-2">TERMINPLANUNG</p><h1 class="h2 mb-1">Sitzungen</h1><p class="text-secondary mb-0">Termine, Zeitfenster, Buchungen und Wartelisten verwalten.</p></div>
+  <a class="btn btn-primary" href="{{ url_for('admin.create_session') }}">＋ Sitzung anlegen</a>
+</div>
+{% if sessions %}
+<div class="table-responsive card table-card">
+  <table class="table align-middle mb-0">
+    <thead><tr><th>Datum</th><th>Zeit</th><th>Ort</th><th>Zeitfenster</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for session in sessions %}
+      <tr>
+        <td class="fw-semibold">{{ session.datum.strftime("%d.%m.%Y") }}</td>
+        <td>{{ session.startzeit.strftime("%H:%M") }}–{{ session.endzeit.strftime("%H:%M") }}</td>
+        <td>{{ session.ort }}</td>
+        <td>{{ session.slots|length }}</td>
+        <td><span class="badge {{ 'text-bg-success' if session.datum >= today else 'text-bg-secondary' }}">{{ 'Kommend' if session.datum >= today else 'Vergangen' }}</span></td>
+        <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{{ url_for('admin.session_detail', session_id=session.id) }}">Verwalten</a></td>
+      </tr>
+    {% endfor %}</tbody>
+  </table>
+</div>
+{% else %}<div class="empty-state"><h2 class="h5">Keine Sitzungen vorhanden</h2><p class="text-secondary">Erstellen Sie eine Sitzung, um Zeitfenster anzulegen.</p><a class="btn btn-primary" href="{{ url_for('admin.create_session') }}">Sitzung anlegen</a></div>{% endif %}
+{% endblock %}

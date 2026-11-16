@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Sitzung anlegen · DigiBo Sprechstunde{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <a class="back-link" href="{{ url_for('admin.sessions') }}">← Sitzungen</a>
+  <p class="eyebrow mt-4 mb-2">TERMINPLANUNG</p><h1 class="h2 mb-1">Neue Sitzung anlegen</h1>
+  <p class="text-secondary">Zeitfenster im 15-Minuten-Takt werden automatisch erstellt. Die Endzeit ist ebenfalls ein Zeitfensterstart.</p>
+</div>
+<form method="post" class="card form-card" novalidate>
+  {{ form.hidden_tag() }}
+  <div class="row g-3">
+    <div class="col-12 col-md-4">{{ form.datum.label(class="form-label") }}{{ form.datum(class="form-control") }}{% for error in form.datum.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}</div>
+    <div class="col-6 col-md-4">{{ form.startzeit.label(class="form-label") }}{{ form.startzeit(class="form-control") }}{% for error in form.startzeit.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}</div>
+    <div class="col-6 col-md-4">{{ form.endzeit.label(class="form-label") }}{{ form.endzeit(class="form-control") }}{% for error in form.endzeit.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}</div>
+    <div class="col-12">{{ form.ort.label(class="form-label") }}{{ form.ort(class="form-control", placeholder="z. B. Bürgerhaus oder Videokonferenz") }}{% for error in form.ort.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}</div>
+    <div class="col-12">{{ form.beschreibung.label(class="form-label") }}{{ form.beschreibung(class="form-control", rows="4", placeholder="Zusätzliche Informationen (optional)") }}{% for error in form.beschreibung.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}</div>
+  </div>
+  <div class="form-actions mt-4 d-flex flex-wrap gap-2 justify-content-end">
+    <a class="btn btn-light" href="{{ url_for('admin.sessions') }}">Abbrechen</a>{{ form.submit(class="btn btn-primary") }}
+  </div>
+</form>
+{% endblock %}

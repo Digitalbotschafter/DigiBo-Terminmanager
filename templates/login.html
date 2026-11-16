@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Anmelden · DigiBo Terminmanager{% endblock %}
+{% block content %}
+<section class="login-shell mx-auto">
+  <div class="login-mark" aria-hidden="true">D</div>
+  <p class="eyebrow text-center mb-2">DIGITALBOTSCHAFTER PIRMASENSER LAND</p>
+  <h1 class="h3 text-center mb-2">Willkommen zurück</h1>
+  <p class="text-secondary text-center mb-4">Melden Sie sich für die interne Terminverwaltung an.</p>
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      {{ form.username.label(class="form-label") }}
+      {{ form.username(class="form-control form-control-lg", autocomplete="username", autofocus=true) }}
+      {% for error in form.username.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+    </div>
+    <div class="mb-4">
+      {{ form.password.label(class="form-label") }}
+      {{ form.password(class="form-control form-control-lg", autocomplete="current-password") }}
+      {% for error in form.password.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+    </div>
+    {{ form.submit(class="btn btn-primary btn-lg w-100") }}
+  </form>
+</section>
+{% endblock %}
