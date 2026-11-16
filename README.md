@@ -62,13 +62,15 @@ Die kostenlose Beginner-Stufe stellt eine Web-App unter `https://<benutzername>.
    ```
 
 3. Übertragen Sie eine freigegebene Kopie der Laufzeitdatenbank direkt über die PythonAnywhere-Dateiverwaltung nach `DigiBo-Terminmanager/instance/digibo.db`. **Laden Sie diese Datei nicht zu GitHub hoch.** Sie kann personenbezogene Teilnehmerdaten enthalten. Die App ergänzt das Wartelisten-Schema beim Start automatisch.
-4. Vor dem öffentlichen Start setzen Sie das Passwort eines bestehenden Administrators sicher in der Bash-Konsole zurück:
+4. Vor dem öffentlichen Start setzen Sie das Passwort eines bestehenden Administrators sicher zurück. Wenn die Bash-Konsole Eingaben annimmt, fragt das Skript das neue Passwort verdeckt ab:
 
    ```bash
    cd ~/DigiBo-Terminmanager
    workon digibo-env
    python set_admin_password.py
    ```
+
+   Falls die Konsole keine Passworteingabe annimmt, verwenden Sie stattdessen `python set_admin_password.py --generate-one-time`. Das Skript legt das zufällige Übergangspasswort in der privaten Datei `~/digibo-admin-password-onetime.txt` ab. Lesen Sie sie ausschließlich über die Dateiverwaltung Ihres Kontos, melden Sie sich damit an, ändern Sie das Passwort direkt im Admin-Bereich und löschen Sie anschließend die Datei.
 
 5. In der PythonAnywhere-Web-Konfiguration stellen Sie das virtuelle Environment auf `digibo-env` und konfigurieren Sie die WSGI-Datei so, dass vor dem Import von `app` diese Werte gesetzt werden:
 
